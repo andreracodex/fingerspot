@@ -325,10 +325,19 @@ function buildDocumentedCommand(payload, overrideCommand = null) {
 
     switch (command) {
         case "GET_USER_INFO":
-        case "DELETE_USER":
         case "GET_USER_PASSTIME":
             body = { user_id: requiredCommandUserId(body) };
             break;
+
+        case "DELETE_USER": {
+            const rawBackupNum = body.backup_num ?? body.backup_number ?? body.backupNum ?? 13;
+            const backupNum = Number(rawBackupNum);
+            body = {
+                user_id: requiredCommandUserId(body),
+                backup_num: Number.isInteger(backupNum) ? backupNum : 13
+            };
+            break;
+        }
 
         case "GET_LOG_DATA":
             body = {};
@@ -654,10 +663,12 @@ function buildSetUserInfoCommand(payload) {
 }
 
 function dequeueCommand(deviceId) {
-    const index = commandQueue.findIndex(command =>
-        !command.targetDeviceId ||
-        command.targetDeviceId === deviceId
-    );
+    const normalizedDeviceId = safeString(deviceId)?.toUpperCase();
+    const index = commandQueue.findIndex(command => {
+        if (!command.targetDeviceId) return true;
+        const target = safeString(command.targetDeviceId)?.toUpperCase();
+        return target === normalizedDeviceId;
+    });
 
     if (index === -1) return null;
 
@@ -673,6 +684,10 @@ function dequeueCommand(deviceId) {
             enqueuedAt: command.enqueuedAt,
             dispatchedAt: mysqlDate()
         }
+    );
+
+    console.log(
+        `${mysqlDate()} | DISPATCH_CMD | device=${deviceId || "-"} | cmd=${command.cmd_code} | id=${command.id}`
     );
 
     return command;
@@ -1894,7 +1909,7 @@ const server =
                                     await deleteEmployee(targetDeviceId, targetUserId);
 
                                     const command = buildDocumentedCommand(
-                                        { device_id: targetDeviceId, user_id: targetUserId },
+                                        { device_id: targetDeviceId, user_id: targetUserId, backup_num: 13 },
                                         "DELETE_USER"
                                     );
                                     const queued = queueCommand(command);

@@ -168,7 +168,7 @@ Daftar endpoint khusus & parameter yang didukung:
 | `SET_USER_PASSTIME` | `POST /api/commands/set-user-passtime` | `device_id`, `user_id` (wajib), jadwal akses |
 | `GET_USER_PASSTIME` | `POST /api/commands/get-user-passtime` | `device_id`, `user_id` (wajib) |
 | `SET_DEVICE_SETTING` | `POST /api/commands/set-device-setting` | `device_id`, parameter setting |
-| `DELETE_USER` | `POST /api/commands/delete-user` | `device_id`, `user_id` (wajib) |
+| `DELETE_USER` | `POST /api/commands/delete-user` | `device_id`, `user_id` (wajib), opsional `backup_num` (default `13` = hapus seluruh data user) |
 | `GET_ALL_USER_INFO` | `POST /api/commands/get-all-user-info` | `device_id` (opsional) |
 
 Atau menggunakan endpoint umum `POST /api/commands`:
