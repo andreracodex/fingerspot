@@ -264,9 +264,19 @@ function validateCompactDeviceTime(value, fieldName) {
 }
 
 function commandBodyValue(payload) {
-    if (payload.params !== undefined) return payload.params;
-    if (payload.body !== undefined) return payload.body;
-    return {};
+    if (payload && payload.params !== undefined && typeof payload.params === "object" && payload.params !== null) {
+        return payload.params;
+    }
+    if (payload && payload.body !== undefined && typeof payload.body === "object" && payload.body !== null) {
+        return payload.body;
+    }
+
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+        return {};
+    }
+
+    const { device_id, deviceId, dev_id, command, cmd_code, ...rest } = payload;
+    return rest;
 }
 
 function requiredCommandUserId(body) {
@@ -283,11 +293,9 @@ function requiredCommandUserId(body) {
     return userId;
 }
 
-function buildDocumentedCommand(payload) {
-    const command = safeString(
-        payload.command ??
-        payload.cmd_code
-    )?.toUpperCase();
+function buildDocumentedCommand(payload, overrideCommand = null) {
+    const rawCommand = overrideCommand || payload?.command || payload?.cmd_code;
+    const command = safeString(rawCommand)?.toUpperCase()?.replace(/-/g, "_");
 
     if (!command || !DOCUMENTED_COMMANDS.has(command)) {
         throw new Error(
@@ -295,13 +303,17 @@ function buildDocumentedCommand(payload) {
         );
     }
 
+    const safePayload = (payload && typeof payload === "object" && !Array.isArray(payload))
+        ? payload
+        : {};
+
     const targetDeviceId = safeString(
-        payload.device_id ??
-        payload.deviceId ??
-        payload.dev_id
+        safePayload.device_id ??
+        safePayload.deviceId ??
+        safePayload.dev_id
     );
 
-    let body = commandBodyValue(payload);
+    let body = commandBodyValue(safePayload);
 
     if (!body || typeof body !== "object" || Array.isArray(body)) {
         throw new Error("params/body command harus berupa object JSON");
@@ -318,15 +330,15 @@ function buildDocumentedCommand(payload) {
 
         case "GET_LOG_DATA":
             body = {};
-            if (payload.params?.begin_time !== undefined || payload.body?.begin_time !== undefined) {
+            if (safePayload.params?.begin_time !== undefined || safePayload.body?.begin_time !== undefined || safePayload.begin_time !== undefined) {
                 body.begin_time = validateCompactDeviceTime(
-                    payload.params?.begin_time ?? payload.body?.begin_time,
+                    safePayload.params?.begin_time ?? safePayload.body?.begin_time ?? safePayload.begin_time,
                     "begin_time"
                 );
             }
-            if (payload.params?.end_time !== undefined || payload.body?.end_time !== undefined) {
+            if (safePayload.params?.end_time !== undefined || safePayload.body?.end_time !== undefined || safePayload.end_time !== undefined) {
                 body.end_time = validateCompactDeviceTime(
-                    payload.params?.end_time ?? payload.body?.end_time,
+                    safePayload.params?.end_time ?? safePayload.body?.end_time ?? safePayload.end_time,
                     "end_time"
                 );
             }
@@ -1532,9 +1544,17 @@ const server =
                             req.method === "POST" &&
                             pathname === "/api/employees";
 
-                        const isCommandApi =
+                        const isGenericCommandApi =
                             req.method === "POST" &&
                             pathname === "/api/commands";
+
+                        const isSpecificCommandApi =
+                            req.method === "POST" &&
+                            pathname.startsWith("/api/commands/") &&
+                            pathname !== "/api/commands";
+
+                        const isCommandApi =
+                            isGenericCommandApi || isSpecificCommandApi;
 
                         const commandStatusPrefix =
                             "/api/commands/";
@@ -1590,9 +1610,17 @@ const server =
                                 return;
                             }
 
+                            const payloadData = parsedData || {};
+
+                            let overrideCommand = null;
+                            if (isSpecificCommandApi) {
+                                const commandSlug = pathname.slice("/api/commands/".length);
+                                overrideCommand = commandSlug;
+                            }
+
                             try {
                                 const command =
-                                    buildDocumentedCommand(parsedData);
+                                    buildDocumentedCommand(payloadData, overrideCommand);
                                 const queued = queueCommand(command);
 
                                 sendJson(

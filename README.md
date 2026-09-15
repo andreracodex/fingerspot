@@ -55,6 +55,42 @@ Field biometrik bersifat opsional. Jika digunakan, template harus berupa base64 
 
 ### Mengirim command ke mesin
 
+Setiap perintah memiliki API endpoint khusus sendiri di bawah `/api/commands/<command>` (dapat menggunakan format kebab-case, snake_case, atau uppercase). Selain itu, endpoint umum `POST /api/commands` juga tetap dapat digunakan.
+
+Contoh menggunakan endpoint khusus:
+
+```http
+POST http://127.0.0.1:9001/api/commands/get-user-info
+Content-Type: application/json
+X-API-Key: ganti-dengan-key-kuat
+
+{
+  "device_id": "9FCE62DB60E142A7",
+  "user_id": "1"
+}
+```
+
+Daftar endpoint khusus & parameter yang didukung:
+
+| Command | Dedicated Endpoint | Body / Parameter JSON |
+|---|---|---|
+| `GET_USER_ID_LIST` | `POST /api/commands/get-user-id-list` | `device_id` (opsional) |
+| `GET_USER_INFO` | `POST /api/commands/get-user-info` | `device_id`, `user_id` (wajib) |
+| `GET_LOG_DATA` | `POST /api/commands/get-log-data` | `device_id`, opsional `begin_time`, `end_time` (`YYYYMMDDhhmmss`) |
+| `SET_TIME` | `POST /api/commands/set-time` | `device_id`, opsional `time` (`YYYYMMDDhhmmss`) |
+| `GET_DEVICE_STATUS` | `POST /api/commands/get-device-status` | `device_id` (opsional) |
+| `SET_FK_NAME` | `POST /api/commands/set-fk-name` | `device_id`, `fk_name` (wajib) |
+| `RESET_FK` | `POST /api/commands/reset-fk` | `device_id` (opsional) |
+| `SET_TIMEZONE` | `POST /api/commands/set-timezone` | `device_id`, `TimeZone_No` (wajib) |
+| `GET_TIMEZONE` | `POST /api/commands/get-timezone` | `device_id` (opsional) |
+| `SET_USER_PASSTIME` | `POST /api/commands/set-user-passtime` | `device_id`, `user_id` (wajib), jadwal akses |
+| `GET_USER_PASSTIME` | `POST /api/commands/get-user-passtime` | `device_id`, `user_id` (wajib) |
+| `SET_DEVICE_SETTING` | `POST /api/commands/set-device-setting` | `device_id`, parameter setting |
+| `DELETE_USER` | `POST /api/commands/delete-user` | `device_id`, `user_id` (wajib) |
+| `GET_ALL_USER_INFO` | `POST /api/commands/get-all-user-info` | `device_id` (opsional) |
+
+Atau menggunakan endpoint umum `POST /api/commands`:
+
 ```http
 POST http://127.0.0.1:9001/api/commands
 Content-Type: application/json
@@ -67,26 +103,7 @@ X-API-Key: ganti-dengan-key-kuat
 }
 ```
 
-Response adalah `202` dengan `command_id`. Mesin mengambil command pada polling berikutnya.
-
-Command yang didukung:
-
-| Command | Parameter |
-|---|---|
-| `GET_USER_ID_LIST` | tidak ada |
-| `GET_USER_INFO` | `user_id` |
-| `GET_LOG_DATA` | opsional `begin_time`, `end_time` dengan format `YYYYMMDDhhmmss` |
-| `SET_TIME` | opsional `time`; default waktu server Asia/Jakarta |
-| `GET_DEVICE_STATUS` | tidak ada |
-| `SET_FK_NAME` | `fk_name` |
-| `RESET_FK` | tidak ada |
-| `SET_TIMEZONE` | struktur zona waktu dari SDK |
-| `GET_TIMEZONE` | tidak ada |
-| `SET_USER_PASSTIME` | `user_id` dan jadwal akses |
-| `GET_USER_PASSTIME` | `user_id` |
-| `SET_DEVICE_SETTING` | struktur setting akses kontrol |
-| `DELETE_USER` | `user_id` |
-| `GET_ALL_USER_INFO` | tidak ada |
+Response adalah HTTP `202` dengan `command_id`. Mesin mengambil command pada polling berikutnya.
 
 Status command:
 
