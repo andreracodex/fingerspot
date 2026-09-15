@@ -204,11 +204,12 @@ function sendDeviceAck(res, transId = null, options = {}) {
     if (res.headersSent) return;
 
     const body = options.body || Buffer.alloc(0);
+    const responseCode = options.responseCode || "OK";
     const headers = {
         "Content-Type": "application/octet-stream",
         "Content-Length": String(body.length),
         "Connection": "close",
-        "response_code": "OK"
+        "response_code": responseCode
     };
 
     if (transId) {
@@ -331,10 +332,11 @@ function buildDocumentedCommand(payload, overrideCommand = null) {
 
         case "DELETE_USER": {
             const rawBackupNum = body.backup_num ?? body.backup_number ?? body.backupNum ?? 13;
-            const backupNum = Number(rawBackupNum);
+            const backupNum = Number.isInteger(Number(rawBackupNum)) ? Number(rawBackupNum) : 13;
+            const userIdStr = requiredCommandUserId(body);
             body = {
-                user_id: requiredCommandUserId(body),
-                backup_num: Number.isInteger(backupNum) ? backupNum : 13
+                user_id: userIdStr,
+                backup_num: backupNum
             };
             break;
         }
@@ -439,7 +441,111 @@ function queueCommand(command) {
         }
     );
 
+    saveCommandToDb(queued);
+
     return queued;
+}
+
+async function saveCommandToDb(command) {
+    try {
+        await db.execute(
+            `INSERT INTO device_commands (id, cmd_code, target_device_id, body, status, enqueued_at)
+             VALUES (?, ?, ?, ?, 'queued', ?)
+             ON DUPLICATE KEY UPDATE status = VALUES(status)`,
+            [
+                command.id,
+                command.cmd_code,
+                command.targetDeviceId || null,
+                command.body ? JSON.stringify(command.body) : null,
+                command.enqueuedAt
+            ]
+        );
+    } catch (err) {
+        console.error("Gagal simpan command ke DB:", err.message);
+    }
+}
+
+async function updateCommandStatusInDb(id, status, extra = {}) {
+    try {
+        const fields = ["status = ?"];
+        const params = [status];
+
+        if (extra.dispatchedAt) {
+            fields.push("dispatched_at = ?");
+            params.push(extra.dispatchedAt);
+        }
+
+        if (extra.completedAt) {
+            fields.push("completed_at = ?");
+            params.push(extra.completedAt);
+        }
+
+        if (extra.returnCode !== undefined) {
+            fields.push("return_code = ?");
+            params.push(extra.returnCode);
+        }
+
+        if (extra.response !== undefined) {
+            fields.push("response_data = ?");
+            params.push(extra.response ? JSON.stringify(extra.response) : null);
+        }
+
+        params.push(id);
+
+        await db.execute(
+            `UPDATE device_commands SET ${fields.join(", ")} WHERE id = ?`,
+            params
+        );
+    } catch (err) {
+        console.error("Gagal update status command di DB:", err.message);
+    }
+}
+
+async function loadPendingCommandsFromDb() {
+    try {
+        const [rows] = await db.execute(
+            `SELECT id, cmd_code, target_device_id, body, status, enqueued_at, dispatched_at, completed_at, return_code, response_data
+             FROM device_commands
+             WHERE status IN ('queued', 'dispatched')
+             ORDER BY id ASC`
+        );
+
+        for (const row of rows) {
+            let body = null;
+            try { body = row.body ? JSON.parse(row.body) : null; } catch {}
+
+            const cmd = {
+                id: row.id,
+                cmd_code: row.cmd_code,
+                targetDeviceId: row.target_device_id,
+                body,
+                binaryBlobs: [],
+                enqueuedAt: row.enqueued_at
+            };
+
+            if (row.status === "queued" && !commandQueue.some(c => c.id === row.id)) {
+                commandQueue.push(cmd);
+            }
+
+            commandResults.set(row.id, {
+                id: row.id,
+                status: row.status,
+                command: row.cmd_code,
+                deviceId: row.target_device_id,
+                params: body,
+                enqueuedAt: row.enqueued_at,
+                dispatchedAt: row.dispatched_at,
+                completedAt: row.completed_at,
+                returnCode: row.return_code
+            });
+        }
+
+        if (rows.length > 0) {
+            console.log(`Command DB : Loaded ${rows.length} pending command(s)`);
+        }
+    } catch (err) {
+        // Table created in testDatabase
+    }
 }
 
 function parseProtocolResult(buffer) {
@@ -690,7 +796,21 @@ function dequeueCommand(deviceId) {
         `${mysqlDate()} | DISPATCH_CMD | device=${deviceId || "-"} | cmd=${command.cmd_code} | id=${command.id}`
     );
 
+    updateCommandStatusInDb(command.id, "dispatched", { dispatchedAt: mysqlDate() });
+
     return command;
+}
+
+function hasPendingCommand(deviceId) {
+    if (!commandQueue.length) return false;
+
+    const normalizedDeviceId = safeString(deviceId)?.toUpperCase();
+
+    return commandQueue.some(command => {
+        if (!command.targetDeviceId) return true;
+        const target = safeString(command.targetDeviceId)?.toUpperCase();
+        return target === normalizedDeviceId;
+    });
 }
 
 function isApiAuthorized(req) {
@@ -1569,9 +1689,12 @@ function sendOK(res) {
     sendJson(res, 200, { status: "success" });
 }
 
-function sendRequestAck(res, requestCode, transId) {
+function sendRequestAck(res, requestCode, transId, deviceId = null) {
     if (requestCode && requestCode !== "healthcheck") {
-        sendDeviceAck(res, transId);
+        const hasPending = deviceId && hasPendingCommand(deviceId);
+        sendDeviceAck(res, transId, {
+            responseCode: hasPending ? "CMD" : "OK"
+        });
         return;
     }
 
@@ -2122,6 +2245,16 @@ const server =
                                         ...result
                                     }
                                 );
+
+                                updateCommandStatusInDb(
+                                    transaction,
+                                    successful ? "completed" : "failed",
+                                    {
+                                        returnCode,
+                                        response: resultSummary.data,
+                                        completedAt: receivedAt
+                                    }
+                                );
                             }
 
                             console.log(
@@ -2142,7 +2275,8 @@ const server =
                             sendRequestAck(
                                 res,
                                 requestCode,
-                                transaction
+                                transaction,
+                                deviceId
                             );
 
                             return;
@@ -2306,12 +2440,20 @@ const server =
                             event.userId &&
                             event.name
                         ) {
-                            await upsertEmployee({
-                                deviceId: event.deviceId,
-                                userId: event.userId,
-                                employeeName: event.name,
-                                source: "DEVICE"
-                            });
+                            const hasPendingDelete = commandQueue.some(cmd =>
+                                cmd.cmd_code === "DELETE_USER" &&
+                                (!cmd.targetDeviceId || cmd.targetDeviceId.toUpperCase() === event.deviceId?.toUpperCase()) &&
+                                String(cmd.body?.user_id) === String(event.userId)
+                            );
+
+                            if (!hasPendingDelete) {
+                                await upsertEmployee({
+                                    deviceId: event.deviceId,
+                                    userId: event.userId,
+                                    employeeName: event.name,
+                                    source: "DEVICE"
+                                });
+                            }
                         }
 
                         event.eventType = classifyInboundEvent(event);
@@ -2360,7 +2502,8 @@ const server =
                                 sendRequestAck(
                                     res,
                                     requestCode,
-                                    transaction
+                                    transaction,
+                                    deviceId
                                 );
 
                                 return;
@@ -2411,7 +2554,8 @@ const server =
                         sendRequestAck(
                             res,
                             requestCode,
-                            transaction
+                            transaction,
+                            deviceId
                         );
 
                     } catch (error) {
@@ -2424,7 +2568,8 @@ const server =
                         sendRequestAck(
                             res,
                             requestCode,
-                            transaction
+                            transaction,
+                            deviceId
                         );
                     }
                 }
@@ -2518,6 +2663,24 @@ async function testDatabase() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         `);
 
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS device_commands (
+                id VARCHAR(100) NOT NULL,
+                cmd_code VARCHAR(50) NOT NULL,
+                target_device_id VARCHAR(100) NULL,
+                body JSON NULL,
+                status VARCHAR(30) NOT NULL DEFAULT 'queued',
+                return_code VARCHAR(50) NULL,
+                response_data LONGTEXT NULL,
+                enqueued_at DATETIME NOT NULL,
+                dispatched_at DATETIME NULL,
+                completed_at DATETIME NULL,
+                PRIMARY KEY (id),
+                KEY idx_device_commands_device (target_device_id),
+                KEY idx_device_commands_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        `);
+
         connection.release();
 
         console.log(
@@ -2562,6 +2725,7 @@ async function start() {
     );
 
     await testDatabase();
+    await loadPendingCommandsFromDb();
 
     server.listen(
         PORT,
