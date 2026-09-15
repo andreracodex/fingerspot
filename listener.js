@@ -8,7 +8,9 @@ const DEVICE_TIME_OFFSET = process.env.DEVICE_TIME_OFFSET || "+07:00";
 const MAX_DEVICE_TIME_SKEW_MS = parseInt(process.env.MAX_DEVICE_TIME_SKEW_MS || String(36 * 60 * 60 * 1000), 10);
 const DUPLICATE_WINDOW_MS = parseInt(process.env.DUPLICATE_WINDOW_MS || String(30 * 1000), 10);
 const COMMAND_QUEUE_LIMIT = parseInt(process.env.COMMAND_QUEUE_LIMIT || "100", 10);
-const API_KEY = process.env.FINGERSPOT_API_KEY || "";
+// API key ini hanya untuk endpoint aplikasi lokal, bukan API Fingerspot Cloud.
+// FINGERSPOT_API_KEY tetap dibaca sebagai fallback agar konfigurasi lama tidak rusak.
+const API_KEY = process.env.LOCAL_API_KEY || process.env.FINGERSPOT_API_KEY || "";
 
 const DOCUMENTED_COMMANDS = new Set([
     "GET_USER_ID_LIST",
@@ -1372,6 +1374,83 @@ async function listEmployees(deviceId = null) {
     return rows;
 }
 
+function normalizeLogDate(value, endOfDay = false) {
+    const text = safeString(value);
+
+    if (!text) return null;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        return `${text} ${endOfDay ? "23:59:59" : "00:00:00"}`;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(text)) {
+        return text.replace("T", " ");
+    }
+
+    throw new Error("tanggal log harus berformat YYYY-MM-DD atau YYYY-MM-DD HH:mm:ss");
+}
+
+async function listAttendanceLogs({
+    deviceId = null,
+    userId = null,
+    startTime = null,
+    endTime = null,
+    limit = 100
+} = {}) {
+    const filters = [];
+    const params = [];
+
+    if (deviceId) {
+        filters.push("device_id = ?");
+        params.push(deviceId);
+    }
+
+    if (userId) {
+        filters.push("user_id = ?");
+        params.push(userId);
+    }
+
+    if (startTime) {
+        filters.push("COALESCE(device_time, received_at) >= ?");
+        params.push(startTime);
+    }
+
+    if (endTime) {
+        filters.push("COALESCE(device_time, received_at) <= ?");
+        params.push(endTime);
+    }
+
+    const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 100, 1), 1000);
+    const where = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+
+    const [rows] = await db.execute(
+        `
+            SELECT
+                id,
+                device_id,
+                device_model,
+                user_id,
+                employee_name,
+                auth_method,
+                device_time,
+                received_at,
+                io_mode,
+                door_mode,
+                request_code,
+                transaction_id,
+                card_number,
+                has_qr
+            FROM attendance_logs
+            ${where}
+            ORDER BY COALESCE(device_time, received_at) DESC, id DESC
+            LIMIT ${safeLimit}
+        `,
+        params
+    );
+
+    return rows;
+}
+
 async function findEmployeeName(deviceId, userId) {
     const normalizedUserId = safeString(userId);
 
@@ -1583,6 +1662,9 @@ const server =
                             req.method === "POST" &&
                             pathname === "/api/commands";
 
+                        const isLogAttApi =
+                            pathname === "/api/log_att";
+
                         const isSpecificCommandApi =
                             req.method === "POST" &&
                             pathname.startsWith("/api/commands/") &&
@@ -1621,6 +1703,85 @@ const server =
                                 }
                             );
 
+                            return;
+                        }
+
+                        /**
+                         * ============================
+                         * LOCAL ATTENDANCE API
+                         * ============================
+                         *
+                         * GET  /api/log_att  membaca data dari database lokal.
+                         * POST /api/log_att  meminta mesin mengirim log historis
+                         * melalui command GET_LOG_DATA.
+                         */
+                        if (isLogAttApi) {
+                            if (!isApiAuthorized(req)) {
+                                sendJson(res, 401, { error: "unauthorized" });
+                                return;
+                            }
+
+                            const requestUrl = new URL(
+                                req.url || "/api/log_att",
+                                `http://${headers.host || "localhost"}`
+                            );
+
+                            if (req.method === "GET") {
+                                try {
+                                    const logs = await listAttendanceLogs({
+                                        deviceId: safeString(requestUrl.searchParams.get("device_id")),
+                                        userId: safeString(requestUrl.searchParams.get("user_id")),
+                                        startTime: normalizeLogDate(
+                                            requestUrl.searchParams.get("start_date"),
+                                            false
+                                        ),
+                                        endTime: normalizeLogDate(
+                                            requestUrl.searchParams.get("end_date"),
+                                            true
+                                        ),
+                                        limit: requestUrl.searchParams.get("limit")
+                                    });
+
+                                    sendJson(res, 200, {
+                                        status: "success",
+                                        count: logs.length,
+                                        data: logs
+                                    });
+                                } catch (error) {
+                                    sendJson(res, 400, { error: error.message });
+                                }
+
+                                return;
+                            }
+
+                            if (req.method === "POST") {
+                                if (!parsedData || typeof parsedData !== "object" || Array.isArray(parsedData)) {
+                                    sendJson(res, 400, { error: "JSON body tidak valid" });
+                                    return;
+                                }
+
+                                try {
+                                    const command = buildDocumentedCommand(
+                                        parsedData,
+                                        "GET_LOG_DATA"
+                                    );
+                                    const queued = queueCommand(command);
+
+                                    sendJson(res, 202, {
+                                        status: "queued",
+                                        action: "get_log_att",
+                                        command_id: queued.id,
+                                        device_id: queued.targetDeviceId,
+                                        queue_length: commandQueue.length
+                                    });
+                                } catch (error) {
+                                    sendJson(res, 400, { error: error.message });
+                                }
+
+                                return;
+                            }
+
+                            sendJson(res, 405, { error: "method tidak didukung" });
                             return;
                         }
 

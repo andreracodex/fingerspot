@@ -26,9 +26,58 @@ Protokol ini memakai HTTP `POST` dengan header seperti:
 
 Listener berjalan di port yang ditentukan di `.env` (default `9001`). Arahkan server/IP pada mesin ke komputer yang menjalankan listener dan port tersebut.
 
-Jika `FINGERSPOT_API_KEY` diatur pada `.env`, pastikan header `X-API-Key` dikirim saat memanggil API endpoint non-lokal.
+Jika `LOCAL_API_KEY` diatur pada `.env`, pastikan header `X-API-Key` dikirim saat memanggil endpoint API lokal.
 
-## API lokal
+## API lokal milik aplikasi
+
+Endpoint berikut dibuat dan dilayani oleh listener ini. Tidak ada request ke API/cloud Fingerspot.
+
+### 1. Ambil log attendance
+
+`GET /api/log_att` membaca log yang sudah diterima dan disimpan di database lokal:
+
+```http
+GET http://127.0.0.1:9001/api/log_att?device_id=9FCE62DB60E142A7&start_date=2026-09-15&end_date=2026-09-15&limit=100
+X-API-Key: ganti-dengan-key-kuat
+```
+
+Filter yang tersedia: `device_id`, `user_id`, `start_date`, `end_date`, dan `limit` (maksimal 1000).
+
+Untuk meminta mesin mengirim log historis ke listener, gunakan `POST` pada path yang sama. Mesin akan mengambil command `GET_LOG_DATA` pada polling berikutnya, kemudian log masuk ke `attendance_logs`:
+
+```http
+POST http://127.0.0.1:9001/api/log_att
+Content-Type: application/json
+X-API-Key: ganti-dengan-key-kuat
+
+{
+  "device_id": "9FCE62DB60E142A7",
+  "begin_time": "20260915000000",
+  "end_time": "20260915235959"
+}
+```
+
+Responsnya `202` dan berisi `command_id`.
+
+### 2. Daftar employee
+
+```http
+GET http://127.0.0.1:9001/api/employees?device_id=9FCE62DB60E142A7
+X-API-Key: ganti-dengan-key-kuat
+```
+
+Data dibaca dari tabel `employees` lokal.
+
+### 3. Hapus employee
+
+```http
+DELETE http://127.0.0.1:9001/api/employees/2?device_id=9FCE62DB60E142A7
+X-API-Key: ganti-dengan-key-kuat
+```
+
+Employee dihapus dari database lokal dan command `DELETE_USER` dimasukkan ke antrean mesin.
+
+## API lokal lainnya
 
 ### Healthcheck
 
