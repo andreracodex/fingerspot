@@ -1,0 +1,485 @@
+{
+  "meta": {
+    "format": "httpie",
+    "version": "1.0.0",
+    "contentType": "collection",
+    "schema": "https://github.com/httpie/schema"
+  },
+  "entry": {
+    "name": "Fingerspot Local API - BS/FK Protocol",
+    "auth": {
+      "type": "none"
+    },
+    "requests": [
+      {
+        "name": "Healthcheck",
+        "method": "GET",
+        "url": "http://127.0.0.1:9001/health",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none"
+        }
+      },
+      {
+        "name": "Tambah atau Sinkronisasi Karyawan",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/employees",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"user_id\": \"2\",\n  \"name\": \"BUDI\",\n  \"privilege\": 0\n}"
+          }
+        }
+      },
+      {
+        "name": "GET_USER_ID_LIST - Daftar PIN",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"GET_USER_ID_LIST\",\n  \"device_id\": \"9FCE62DB60E142A7\"\n}"
+          }
+        }
+      },
+      {
+        "name": "GET_USER_INFO - Data User",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"GET_USER_INFO\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"user_id\": \"1\"\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "GET_LOG_DATA - Log Periode",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"GET_LOG_DATA\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"begin_time\": \"20260915000000\",\n    \"end_time\": \"20260915235959\"\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "SET_TIME - Atur Waktu",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"SET_TIME\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"time\": \"20260915120000\"\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "GET_DEVICE_STATUS - Status Mesin",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"GET_DEVICE_STATUS\",\n  \"device_id\": \"9FCE62DB60E142A7\"\n}"
+          }
+        }
+      },
+      {
+        "name": "SET_FK_NAME - Nama Mesin",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"SET_FK_NAME\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"fk_name\": \"R6 Kantor\"\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "RESET_FK - Restart Mesin",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"RESET_FK\",\n  \"device_id\": \"9FCE62DB60E142A7\"\n}"
+          }
+        }
+      },
+      {
+        "name": "SET_TIMEZONE - Zona Waktu Akses",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"SET_TIMEZONE\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"TimeZone_No\": 1,\n    \"T1\": { \"start\": \"0800\", \"end\": \"1700\" },\n    \"T2\": { \"start\": \"0000\", \"end\": \"0000\" },\n    \"T3\": { \"start\": \"0000\", \"end\": \"0000\" },\n    \"T4\": { \"start\": \"0000\", \"end\": \"0000\" },\n    \"T5\": { \"start\": \"0000\", \"end\": \"0000\" },\n    \"T6\": { \"start\": \"0000\", \"end\": \"0000\" }\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "GET_TIMEZONE - Ambil Zona Waktu",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"GET_TIMEZONE\",\n  \"device_id\": \"9FCE62DB60E142A7\"\n}"
+          }
+        }
+      },
+      {
+        "name": "SET_USER_PASSTIME - Jadwal Akses User",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"SET_USER_PASSTIME\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"user_id\": \"1\",\n    \"Valide_Date_start\": \"20260101\",\n    \"Valide_Date_end\": \"20261231\",\n    \"Week_TimeZone_No\": [1, 1, 1, 1, 1, 1, 1]\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "GET_USER_PASSTIME - Jadwal Akses User",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"GET_USER_PASSTIME\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"user_id\": \"1\"\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "SET_DEVICE_SETTING - Setting Akses Kontrol",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"SET_DEVICE_SETTING\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"OpenDoor_Delay\": 5,\n    \"DoorMagnetic_Type\": \"open\",\n    \"DoorMagnetic_Delay\": 10,\n    \"Anti-back\": \"no\",\n    \"Alarm_Delay\": 30,\n    \"Use_Alarm\": \"yes\",\n    \"Wiegand_Type\": \"26\",\n    \"Sleep_Time\": 0,\n    \"Screensavers_Time\": 60,\n    \"Reverify_Time\": 3,\n    \"Glog_Warning\": 1000,\n    \"Volume\": 5\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "DELETE_USER - Hapus User",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"DELETE_USER\",\n  \"device_id\": \"9FCE62DB60E142A7\",\n  \"params\": {\n    \"user_id\": \"1\"\n  }\n}"
+          }
+        }
+      },
+      {
+        "name": "GET_ALL_USER_INFO - Sinkronisasi Semua User",
+        "method": "POST",
+        "url": "http://127.0.0.1:9001/api/commands",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "text": {
+            "format": "application/json",
+            "value": "{\n  \"command\": \"GET_ALL_USER_INFO\",\n  \"device_id\": \"9FCE62DB60E142A7\"\n}"
+          }
+        }
+      },
+      {
+        "name": "Status Command",
+        "method": "GET",
+        "url": "http://127.0.0.1:9001/api/commands/REPLACE_WITH_COMMAND_ID",
+        "headers": [
+          {
+            "enabled": false,
+            "name": "X-API-Key",
+            "value": "ISI_JIKA_FINGERSPOT_API_KEY_DIATUR"
+          }
+        ],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none"
+        }
+      }
+    ]
+  }
+}
