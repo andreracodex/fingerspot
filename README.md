@@ -36,10 +36,19 @@ Jika `FINGERSPOT_API_KEY` diatur pada `.env`, pastikan header `X-API-Key` dikiri
 GET http://127.0.0.1:9001/health
 ```
 
-### Menambah atau sinkronisasi user
+### Manajemen User / Karyawan
 
+Endpoint untuk mengelola user di database server sekaligus mensinkronkan perintah (`SET_USER_INFO` / `DELETE_USER`) ke mesin absensi.
+
+#### 1. Menampilkan Daftar User
 ```http
-POST http://127.0.0.1:9001/api/employees
+GET http://127.0.0.1:9001/api/users
+X-API-Key: ganti-dengan-key-kuat
+```
+
+#### 2. Menambah User Baru (Add User)
+```http
+POST http://127.0.0.1:9001/api/users
 Content-Type: application/json
 X-API-Key: ganti-dengan-key-kuat
 
@@ -50,8 +59,32 @@ X-API-Key: ganti-dengan-key-kuat
   "privilege": 0
 }
 ```
+*Atau bisa juga memanggil `POST /api/users/add` atau `POST /api/employees`.*
 
-Field biometrik bersifat opsional. Jika digunakan, template harus berupa base64 dan dikirim sebagai `templates` dengan `backup_number`; foto dapat dikirim sebagai `photo_base64`.
+Field biometrik bersifat opsional:
+- Template biometrik base64 dikirim sebagai `templates` (array of `{ "backup_number": 0, "base64": "..." }`).
+- Foto dapat dikirim sebagai `photo_base64`.
+
+#### 3. Mengedit Data User (Edit User)
+```http
+PUT http://127.0.0.1:9001/api/users/2
+Content-Type: application/json
+X-API-Key: ganti-dengan-key-kuat
+
+{
+  "device_id": "9FCE62DB60E142A7",
+  "name": "BUDI SANTOSO",
+  "privilege": 0
+}
+```
+*Atau bisa juga memanggil `POST /api/users/edit` dengan `user_id` di dalam JSON body.*
+
+#### 4. Menghapus User (Delete User)
+```http
+DELETE http://127.0.0.1:9001/api/users/2?device_id=9FCE62DB60E142A7
+X-API-Key: ganti-dengan-key-kuat
+```
+*Atau memanggil `POST /api/users/delete` dengan body `{ "user_id": "2", "device_id": "9FCE62DB60E142A7" }`.*
 
 ### Mengirim command ke mesin
 

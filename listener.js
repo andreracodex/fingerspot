@@ -1336,6 +1336,42 @@ async function upsertEmployee({
     return true;
 }
 
+async function deleteEmployee(deviceId, userId) {
+    const normalizedUserId = safeString(userId);
+
+    if (!normalizedUserId) return false;
+
+    const normalizedDeviceId = normalizeDeviceScope(deviceId);
+
+    await db.execute(
+        `
+            DELETE FROM employees
+            WHERE user_id = ?
+              AND (device_id = ? OR device_id = '')
+        `,
+        [normalizedUserId, normalizedDeviceId]
+    );
+
+    return true;
+}
+
+async function listEmployees(deviceId = null) {
+    const normalizedDeviceId = deviceId ? safeString(deviceId) : null;
+    let sql = `
+        SELECT device_id, user_id, employee_name AS name, privilege, source, created_at, updated_at
+        FROM employees
+    `;
+    const params = [];
+    if (normalizedDeviceId) {
+        sql += ` WHERE device_id = ? OR device_id = ''`;
+        params.push(normalizedDeviceId);
+    }
+    sql += ` ORDER BY id DESC`;
+
+    const [rows] = await db.execute(sql, params);
+    return rows;
+}
+
 async function findEmployeeName(deviceId, userId) {
     const normalizedUserId = safeString(userId);
 
@@ -1540,9 +1576,8 @@ const server =
                             req.url || "/"
                         ).split("?")[0];
 
-                        const isEmployeeApi =
-                            req.method === "POST" &&
-                            pathname === "/api/employees";
+                        const userRouteMatch =
+                            pathname.match(/^\/api\/(users|employees)(?:\/(.*))?$/);
 
                         const isGenericCommandApi =
                             req.method === "POST" &&
@@ -1647,7 +1682,7 @@ const server =
                             return;
                         }
 
-                        if (isEmployeeApi) {
+                        if (userRouteMatch) {
                             if (!isApiAuthorized(req)) {
                                 sendJson(
                                     res,
@@ -1658,89 +1693,160 @@ const server =
                                 return;
                             }
 
-                            if (!parsedData || typeof parsedData !== "object") {
-                                sendJson(
-                                    res,
-                                    400,
-                                    { error: "JSON body tidak valid" }
-                                );
+                            const subPath = safeString(userRouteMatch[2]) || "";
+                            const method = req.method.toUpperCase();
 
+                            // 1. GET: List users
+                            if (method === "GET") {
+                                try {
+                                    const queryDeviceId = req.url.includes("?")
+                                        ? new URLSearchParams(req.url.split("?")[1]).get("device_id")
+                                        : null;
+                                    const users = await listEmployees(queryDeviceId);
+                                    sendJson(res, 200, { status: "success", data: users });
+                                } catch (err) {
+                                    sendJson(res, 500, { error: err.message });
+                                }
                                 return;
                             }
 
-                            if (commandQueue.length >= COMMAND_QUEUE_LIMIT) {
-                                sendJson(
-                                    res,
-                                    429,
-                                    { error: "command queue penuh" }
-                                );
+                            // 2. DELETE: Hapus User
+                            if (method === "DELETE" || subPath === "delete") {
+                                const queryParams = req.url.includes("?")
+                                    ? new URLSearchParams(req.url.split("?")[1])
+                                    : new URLSearchParams();
 
+                                const payload = parsedData || {};
+                                let targetUserId = (subPath && subPath !== "delete")
+                                    ? subPath
+                                    : (payload.user_id || payload.userId || queryParams.get("user_id"));
+                                let targetDeviceId = payload.device_id || payload.deviceId || queryParams.get("device_id") || null;
+
+                                targetUserId = safeString(targetUserId);
+
+                                if (!targetUserId) {
+                                    sendJson(res, 400, { error: "user_id wajib diisi untuk menghapus user" });
+                                    return;
+                                }
+
+                                try {
+                                    await deleteEmployee(targetDeviceId, targetUserId);
+
+                                    const command = buildDocumentedCommand(
+                                        { device_id: targetDeviceId, user_id: targetUserId },
+                                        "DELETE_USER"
+                                    );
+                                    const queued = queueCommand(command);
+
+                                    sendJson(res, 202, {
+                                        status: "queued",
+                                        action: "delete_user",
+                                        command_id: queued.id,
+                                        user_id: targetUserId,
+                                        device_id: queued.targetDeviceId,
+                                        queue_length: commandQueue.length
+                                    });
+                                } catch (err) {
+                                    sendJson(res, 400, { error: err.message });
+                                }
                                 return;
                             }
 
-                            try {
-                                const command =
-                                    buildSetUserInfoCommand(
-                                        parsedData
+                            // 3. POST / PUT: Tambah atau Edit User
+                            if (method === "POST" || method === "PUT") {
+                                if (!parsedData || typeof parsedData !== "object") {
+                                    sendJson(
+                                        res,
+                                        400,
+                                        { error: "JSON body tidak valid" }
                                     );
 
-                                await upsertEmployee({
-                                    deviceId:
-                                        command.targetDeviceId,
-                                    userId:
-                                        command.body.user_id,
-                                    employeeName:
-                                        command.body.user_name,
-                                    privilege:
-                                        command.body.user_privilege,
-                                    source: "API"
-                                });
+                                    return;
+                                }
 
-                                const commandId =
-                                    `set-user-${Date.now()}-${commandQueue.length + 1}`;
+                                if (commandQueue.length >= COMMAND_QUEUE_LIMIT) {
+                                    sendJson(
+                                        res,
+                                        429,
+                                        { error: "command queue penuh" }
+                                    );
 
-                                commandQueue.push({
-                                    id: commandId,
-                                    cmd_code: "SET_USER_INFO",
-                                    targetDeviceId:
-                                        command.targetDeviceId,
-                                    body: command.body,
-                                    binaryBlobs:
-                                        command.binaryBlobs,
-                                    enqueuedAt: mysqlDate()
-                                });
+                                    return;
+                                }
 
-                                commandResults.set(
-                                    commandId,
-                                    {
-                                        id: commandId,
-                                        status: "queued",
-                                        command: "SET_USER_INFO",
+                                const payload = { ...parsedData };
+                                if (subPath && !["add", "edit", "update"].includes(subPath)) {
+                                    payload.user_id = subPath;
+                                }
+
+                                try {
+                                    const command =
+                                        buildSetUserInfoCommand(
+                                            payload
+                                        );
+
+                                    await upsertEmployee({
                                         deviceId:
                                             command.targetDeviceId,
+                                        userId:
+                                            command.body.user_id,
+                                        employeeName:
+                                            command.body.user_name,
+                                        privilege:
+                                            command.body.user_privilege,
+                                        source: "API"
+                                    });
+
+                                    const commandId =
+                                        `set-user-${Date.now()}-${commandQueue.length + 1}`;
+
+                                    commandQueue.push({
+                                        id: commandId,
+                                        cmd_code: "SET_USER_INFO",
+                                        targetDeviceId:
+                                            command.targetDeviceId,
+                                        body: command.body,
+                                        binaryBlobs:
+                                            command.binaryBlobs,
                                         enqueuedAt: mysqlDate()
-                                    }
-                                );
+                                    });
 
-                                sendJson(
-                                    res,
-                                    202,
-                                    {
-                                        status: "queued",
-                                        command_id: commandId,
-                                        queue_length:
-                                            commandQueue.length
-                                    }
-                                );
-                            } catch (error) {
-                                sendJson(
-                                    res,
-                                    400,
-                                    { error: error.message }
-                                );
+                                    commandResults.set(
+                                        commandId,
+                                        {
+                                            id: commandId,
+                                            status: "queued",
+                                            command: "SET_USER_INFO",
+                                            deviceId:
+                                                command.targetDeviceId,
+                                            enqueuedAt: mysqlDate()
+                                        }
+                                    );
+
+                                    const isEdit = method === "PUT" || subPath === "edit" || subPath === "update";
+
+                                    sendJson(
+                                        res,
+                                        202,
+                                        {
+                                            status: "queued",
+                                            action: isEdit ? "edit_user" : "add_user",
+                                            command_id: commandId,
+                                            user_id: command.body.user_id,
+                                            device_id: command.targetDeviceId,
+                                            queue_length: commandQueue.length
+                                        }
+                                    );
+                                } catch (error) {
+                                    sendJson(
+                                        res,
+                                        400,
+                                        { error: error.message }
+                                    );
+                                }
+
+                                return;
                             }
-
-                            return;
                         }
 
                         if (
